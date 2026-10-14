@@ -12,3 +12,6 @@ build/
 dist/
 htmlcov/
 .idea/
+.venv-wan/
+models/
+outputs/

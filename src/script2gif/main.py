@@ -14,9 +14,7 @@ def main() -> int:
     application.setOrganizationName("Script2Gif")
     try:
         result = bootstrap()
-        logging.getLogger(__name__).info(
-            "application_started cleaned_bytes=%s", result.cleaned_bytes
-        )
+        logging.getLogger(__name__).info("application_started mode=local_apng")
         from script2gif.ui.main_window import MainWindow
 
         window = MainWindow(result.paths)

@@ -1,109 +1,54 @@
-# Script2Gif
+# Script2Gif - 本地 APNG
 
-Script2Gif 是一个本地优先的 Windows 桌面工具：用户输入剧本，程序通过
-`qwen3.8-flash` 生成结构化分镜，通过 `wan2.7-image-pro` 生成关键帧，再使用本地
-FFmpeg 制作运镜动画并导出 MP4 和 GIF。
+一个离线 Windows 桌面工具：输入完整剧本，自动拆分后使用本地 Wan2.1 T2V-1.3B
+逐个生成动态镜头，导出多份 APNG 和原始 PNG 序列帧。不需要分镜确认、API Key 或 FFmpeg。
 
-程序不使用数据库，也不需要部署服务端。项目、图片和成品保存在用户选择的本地目录；
-阿里云 API Key 存放在 Windows Credential Manager 中，不写入项目和配置文件。
+## 功能
 
-## 当前功能
+- 中文或英文剧本输入，直接拆分并批量生成
+- 分辨率选择：512x288 或 832x480
+- 每镜头播放时长输入：0.5–5 秒，默认 1.7 秒
+- 模型目录和推理环境选择；随机种子内部固定为 42
+- 独立进程推理、阶段进度和取消
+- APNG 动画预览、播放暂停、另存为和打开输出目录
+- 镜头结果列表、整体进度、失败记录；取消保留已完成结果
 
-- 新建、保存和打开本地项目
-- 剧本导入和可编辑分镜表格
-- Qwen OpenAI 兼容接口结构化生成分镜
-- Wan2.7 异步生成关键帧及任务状态持久化
-- 角色参考图导入和多图参考
-- 相同请求内容哈希缓存
-- FFmpeg 平移、缩放、字幕、MP4 拼接和 GIF 调色板导出
-- 日志轮转、密钥脱敏、缓存与临时文件自动清理
-- PyInstaller Windows `onedir` 打包
+拆分规则：优先按空行段落拆分，没有多个段落时按行拆分，单行文本按中英文句末标点拆分。
+这是离线规则拆分，不包含大模型分镜分析。所有镜头串行生成，使用同一分辨率和时长。
 
-## 本地开发
+## 启动
 
-要求 Python 3.9+，推荐 Python 3.12。
+已准备好本地环境时，双击 `run_local_apng.bat`，或在项目目录运行：
 
-```bash
-python -m venv .venv
-source .venv/bin/activate        # Windows: .venv\Scripts\activate
-python -m pip install -e '.[dev,build]'
-python main.py
+```powershell
+.\.venv-wan\Scripts\python.exe main.py
 ```
 
-首次启动后打开“设置”，填写：
+新设备先按照 [环境与模型准备说明](scripts/LOCAL_APNG.md) 安装推理依赖、
+下载或导入模型，并安装桌面依赖：
 
-1. 阿里云百炼 Workspace ID；
-2. 对应地域的 API Key；
-3. 本地 FFmpeg 路径（没有随安装包分发时必填）。
-
-北京地域接口地址由程序按以下格式生成：
-
-```text
-https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com
+```powershell
+.\.venv-wan\Scripts\python.exe -m pip install -e .
 ```
 
-也可以在开发环境通过 `DASHSCOPE_API_KEY` 环境变量提供密钥。
+目前已验证 Python 3.12、Windows、16 GB 显存 NVIDIA GPU。
+其他硬件尚未验证；模型文件约 27 GB，模型和推理环境需要独立准备。
+现有打包脚本尚未完成本地模型运行时的分发验证。
 
-## 项目数据
+## 文件位置
 
-每个作品都是可迁移的独立目录：
+- `models/wan2.1-t2v-1.3b/`：默认模型目录
+- `outputs/desktop/批次目录/`：原始剧本、批次记录、编号 APNG、原始帧和运行报告
+- `scripts/local_apng.py`：模型下载、硬件检测与离线生成入口
 
-```text
-project/
-├── project.json
-├── script.txt
-├── characters/
-├── shots/
-├── assets/
-│   ├── references/
-│   ├── keyframes/
-│   ├── videos/
-│   └── audio/
-├── jobs/
-├── temp/
-├── outputs/
-└── logs/
+模型和生成结果不提交到 Git。复制完整模型目录到另一台电脑后，
+可在界面中选择对应目录，配合兼容的推理环境离线运行。
+
+## 验证
+
+```powershell
+.\.venv-wan\Scripts\python.exe -m pytest
+.\.venv-wan\Scripts\python.exe scripts/verify_desktop_apng.py --render-only
 ```
 
-应用日志、缓存和临时目录位于系统的用户应用数据目录。日志单文件最大 10 MB，保留
-5 份；缓存默认上限 5 GB，过期缓存默认保留 30 天。
-
-## 测试
-
-```bash
-pytest
-ruff check src tests main.py launcher.py
-```
-
-真实模型调用不会进入自动测试，需要用户自己的 API Key。
-
-## Windows 打包
-
-`resources/ffmpeg/` 为空时，目标机器必须安装 FFmpeg，或让用户在设置中选择
-`ffmpeg.exe`。如需随软件分发，将有合法分发许可的 Windows FFmpeg 二进制放到：
-
-```text
-resources/ffmpeg/ffmpeg.exe
-```
-
-然后在 Windows 10/11 x64 构建机运行：
-
-```bat
-build_windows.bat
-```
-
-输出目录：
-
-```text
-dist\Script2Gif\Script2Gif.exe
-dist\installer\Script2Gif-Setup-0.2.0.exe    # 构建机安装 Inno Setup 时生成
-```
-
-PyInstaller 不是跨平台编译器，因此 Windows EXE 必须在 Windows 或 Windows CI 中构建。
-
-## 安全说明
-
-- 不要将开发者自己的 API Key 写入 EXE 或源码。
-- 对外分发时使用 BYOK：每位用户输入自己的百炼 API Key。
-- `project.json` 和日志不会记录 API Key。
-- 发布前应对安装包签名，并确认所分发 FFmpeg 构建的许可证要求。
+移除 `--render-only` 会执行真实模型生成验证。截图保存到 `outputs/desktop-qa/`。
